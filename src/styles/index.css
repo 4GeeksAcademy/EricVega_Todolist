@@ -1,4 +1,4 @@
-/* General styles */
+
 body {
     font-family: Arial, sans-serif;
     background-color: #f7f7f7;
@@ -20,36 +20,40 @@ body {
 }
 
 .title {
-    font-size: 36px;
+    font-size: 72px;
+    font-weight: 200;
     color: #e6e6e6;
     margin-bottom: 20px;
 }
 
 .todo-input input {
     width: 100%;
-    padding: 10px;
-    font-size: 16px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 15px;
+    font-size: 18px;
+    border: none;
+    border-bottom: 1px solid #ededed;
     outline: none;
 }
 
-.todo-input input:focus {
-    border-color: #a5a5a5;
+.todo-input input::placeholder {
+    color: #e6e6e6;
+    font-style: italic;
 }
 
 .todo-list {
     list-style: none;
     padding: 0;
     margin: 20px 0;
+    text-align: left;
 }
 
 .todo-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
-    border-bottom: 1px solid #eee;
+    padding: 15px;
+    border-bottom: 1px solid #ededed;
+    font-size: 18px;
     position: relative;
 }
 
@@ -57,21 +61,41 @@ body {
     display: block;
 }
 
+.todo-item span {
+    flex: 1;
+    text-align: left;
+    padding-left: 10px;
+}
+
 .no-tasks {
-    color: #a5a5a5;
+    color: #e6e6e6;
     font-style: italic;
+    text-align: center;
+    font-size: 16px;
 }
 
 .delete-button {
     display: none;
     background: none;
     border: none;
-    color: red;
+    color: #cc9a9a;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.delete-button:hover {
+    color: #af5b5e;
 }
 
 .footer {
+    text-align: left;
     font-size: 14px;
-    color: #a5a5a5;
+    color: #bcbcbc;
+    padding-top: 10px;
+}
+
+.footer span {
+    font-weight: bold;
+    color: #4caf50;
 }
