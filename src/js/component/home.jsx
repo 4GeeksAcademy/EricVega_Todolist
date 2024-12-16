@@ -11,30 +11,43 @@ const Home = () => {
 
     const fetchTasks = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/todos/${USERNAME}`);
+            const response = await fetch(`${API_BASE_URL}/todos/${USERNAME}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    accept: "application/json",
+                },
+                body: null,
+            });
+    
             if (response.ok) {
                 const data = await response.json();
-                console.log("Tareas obtenidas:", data);
-                setTasks(data);
-            } else if (response.status === 404) {
-                console.log("Usuario no encontrado. Creando usuario...");
-                await createUser();
+                if (Array.isArray(data)) {
+                    console.log("Tareas obtenidas:", data);
+                    setTasks(data);
+                } else {
+                    console.error("El servidor devolvió un valor no válido:", data);
+                    setTasks([]); // Asegúrate de asignar un arreglo vacío en caso de error
+                }
             } else {
-                console.error("Error al obtener tareas:", response.statusText);
+                console.error(`Error al obtener tareas (Status ${response.status}):`, response.statusText);
             }
         } catch (error) {
             console.error("Error al obtener tareas:", error);
+            setTasks([]); // Manejo de errores
         } finally {
             setLoading(false);
         }
     };
+    
+    
 
     const createUser = async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/users/${USERNAME}`, {
                 method: "POST",
                 headers: { accept: "application/json" },
-                body: null,
+                body: null, // Confirma si este endpoint requiere algún cuerpo
             });
             if (response.ok) {
                 console.log("Usuario creado exitosamente");
@@ -46,11 +59,12 @@ const Home = () => {
             console.error("Error al crear usuario:", error);
         }
     };
+    
 
     const addTask = async () => {
         if (newTask.trim()) {
             const task = { label: newTask.trim(), is_done: false };
-
+    
             try {
                 const response = await fetch(`${API_BASE_URL}/todos/${USERNAME}`, {
                     method: "POST",
@@ -60,21 +74,30 @@ const Home = () => {
                     },
                     body: JSON.stringify(task),
                 });
-
+    
                 if (response.ok) {
                     const createdTask = await response.json();
-                    console.log("Tarea creada:", createdTask);
-                    setTasks([...tasks, createdTask]);
-                    setNewTask("");
+    
+                    if (createdTask && typeof createdTask === "object" && !Array.isArray(createdTask)) {
+                        // El servidor devolvió un objeto individual
+                        console.log("Tarea añadida:", createdTask);
+                        setTasks((prevTasks) => [...prevTasks, createdTask]); // Añadir la nueva tarea al estado
+                    } else {
+                        console.error("El servidor devolvió un valor inesperado:", createdTask);
+                    }
+                    setNewTask(""); // Limpia el input después de añadir la tarea
                 } else {
-                    const errorDetails = await response.json();
-                    console.error("Error al añadir tarea:", response.status, errorDetails);
+                    console.error(
+                        `Error al añadir tarea (Status ${response.status}):`,
+                        await response.json()
+                    );
                 }
             } catch (error) {
                 console.error("Error al añadir tarea:", error);
             }
         }
     };
+         
 
     const deleteTask = async (taskId) => {
         console.log("Eliminando tarea con ID:", taskId);
@@ -83,17 +106,27 @@ const Home = () => {
                 method: "DELETE",
                 headers: { accept: "application/json" },
             });
-
+    
             if (response.ok) {
+                // Si el servidor no devuelve cuerpo, actualiza directamente el estado local
+                console.log("Tarea eliminada correctamente");
                 setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
             } else {
-                const errorDetails = await response.json();
-                console.error("Error al eliminar tarea:", response.status, errorDetails);
+                // Intenta leer el mensaje de error si el servidor devuelve algo
+                let errorDetails;
+                try {
+                    errorDetails = await response.json();
+                } catch {
+                    errorDetails = "Sin detalles adicionales";
+                }
+                console.error(`Error al eliminar tarea (Status ${response.status}):`, errorDetails);
             }
         } catch (error) {
             console.error("Error al eliminar tarea:", error);
         }
     };
+    
+    
 
     useEffect(() => {
         fetchTasks();
@@ -119,6 +152,7 @@ const Home = () => {
                     {Array.isArray(tasks) && tasks.length === 0 ? (
                         <li className="no-tasks">No hay tareas, añadir tareas</li>
                     ) : (
+                        Array.isArray(tasks) &&
                         tasks.map((task) => (
                             <li key={task.id} className="todo-item">
                                 {task.label}
