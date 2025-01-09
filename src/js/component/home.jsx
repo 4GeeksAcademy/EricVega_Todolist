@@ -9,32 +9,33 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [newTask, setNewTask] = useState("");
 
+    // Fetch tasks using GET
     const fetchTasks = async () => {
         try {
+            const task = {
+                label: "Sample Task", // Cambia este texto por el que desees
+                is_done: false, // Estado inicial de la tarea
+            };
+    
             const response = await fetch(`${API_BASE_URL}/todos/${USERNAME}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     accept: "application/json",
                 },
-                body: null,
+                body: JSON.stringify(task), // Enviar objeto válido
             });
     
             if (response.ok) {
                 const data = await response.json();
-                if (Array.isArray(data)) {
-                    console.log("Tareas obtenidas:", data);
-                    setTasks(data);
-                } else {
-                    console.error("El servidor devolvió un valor no válido:", data);
-                    setTasks([]); // Asegúrate de asignar un arreglo vacío en caso de error
-                }
+                console.log("Tareas creadas:", data);
+                setTasks([data]); // Si es necesario, actualiza el estado con la nueva tarea
             } else {
-                console.error(`Error al obtener tareas (Status ${response.status}):`, response.statusText);
+                const errorDetails = await response.json();
+                console.error(`Error al crear tarea: ${response.status}`, errorDetails);
             }
         } catch (error) {
-            console.error("Error al obtener tareas:", error);
-            setTasks([]); // Manejo de errores
+            console.error("Error al crear tarea:", error);
         } finally {
             setLoading(false);
         }
@@ -42,117 +43,144 @@ const Home = () => {
     
     
 
+    // Create user if not exists
     const createUser = async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/users/${USERNAME}`, {
                 method: "POST",
-                headers: { accept: "application/json" },
-                body: null, // Confirma si este endpoint requiere algún cuerpo
+                headers: {
+                    "Content-Type": "application/json",
+                    accept: "application/json",
+                },
+                body: JSON.stringify({ username: USERNAME }),
             });
+    
             if (response.ok) {
                 console.log("Usuario creado exitosamente");
-                setTasks([]);
+            } else if (response.status === 400) {
+                const errorDetails = await response.json();
+                if (errorDetails.detail === "User already exists.") {
+                    console.log("El usuario ya existe, procediendo a obtener las tareas.");
+                } else {
+                    console.error(`Error al crear usuario:`, errorDetails.detail);
+                }
             } else {
-                console.error("Error al crear usuario:", response.statusText);
+                console.error(`Error desconocido al crear usuario: ${response.status} ${response.statusText}`);
             }
         } catch (error) {
             console.error("Error al crear usuario:", error);
+        } finally {
+            // Siempre intentar obtener las tareas, incluso si el usuario ya existía
+            fetchTasks();
         }
     };
     
+    
 
-    const addTask = async () => {
-        if (newTask.trim()) {
-            const task = { label: newTask.trim(), is_done: false };
-    
-            try {
-                const response = await fetch(`${API_BASE_URL}/todos/${USERNAME}`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        accept: "application/json",
-                    },
-                    body: JSON.stringify(task),
-                });
-    
-                if (response.ok) {
-                    const createdTask = await response.json();
-    
-                    if (createdTask && typeof createdTask === "object" && !Array.isArray(createdTask)) {
-                        // El servidor devolvió un objeto individual
-                        console.log("Tarea añadida:", createdTask);
-                        setTasks((prevTasks) => [...prevTasks, createdTask]); // Añadir la nueva tarea al estado
-                    } else {
-                        console.error("El servidor devolvió un valor inesperado:", createdTask);
-                    }
-                    setNewTask(""); // Limpia el input después de añadir la tarea
-                } else {
-                    console.error(
-                        `Error al añadir tarea (Status ${response.status}):`,
-                        await response.json()
-                    );
-                }
-            } catch (error) {
-                console.error("Error al añadir tarea:", error);
-            }
+    // Add a new task
+    const addTask = async (todoId) => {
+        if (!newTask.trim()) {
+            console.log("El campo de tarea está vacío.");
+            return;
         }
-    };
-         
-
-    const deleteTask = async (taskId) => {
-        console.log("Eliminando tarea con ID:", taskId);
+    
+        const task = {
+            label: newTask.trim(), // El texto de la tarea ingresada
+            is_done: false, // Estado inicial de la tarea
+        };
+    
+        // Si no se pasa un `todoId`, asumimos que es una nueva tarea
+        const method = todoId ? "PUT" : "POST";
+        const url = todoId
+            ? `${API_BASE_URL}/todos/${todoId}` // Actualizar una tarea existente
+            : `${API_BASE_URL}/todos/${USERNAME}`; // Crear una nueva tarea
+    
         try {
-            const response = await fetch(`${API_BASE_URL}/todos/${taskId}`, {
-                method: "DELETE",
-                headers: { accept: "application/json" },
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    "Content-Type": "application/json",
+                    accept: "application/json",
+                },
+                body: JSON.stringify(task), // Enviar el objeto como string JSON
             });
     
             if (response.ok) {
-                // Si el servidor no devuelve cuerpo, actualiza directamente el estado local
-                console.log("Tarea eliminada correctamente");
-                setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
-            } else {
-                // Intenta leer el mensaje de error si el servidor devuelve algo
-                let errorDetails;
-                try {
-                    errorDetails = await response.json();
-                } catch {
-                    errorDetails = "Sin detalles adicionales";
+                const taskResponse = await response.json();
+                console.log("Tarea añadida/actualizada exitosamente:", taskResponse);
+    
+                // Actualizar la lista de tareas
+                if (todoId) {
+                    // Si es una actualización, reemplazamos la tarea
+                    setTasks((prevTasks) =>
+                        prevTasks.map((task) =>
+                            task.id === todoId ? taskResponse : task
+                        )
+                    );
+                } else {
+                    // Si es una nueva tarea, la añadimos
+                    setTasks((prevTasks) => [...prevTasks, taskResponse]);
                 }
-                console.error(`Error al eliminar tarea (Status ${response.status}):`, errorDetails);
+    
+                // Limpiar el input
+                setNewTask("");
+            } else {
+                const errorDetails = await response.json();
+                console.error(`Error al añadir/actualizar tarea: ${response.status}`, errorDetails);
             }
         } catch (error) {
-            console.error("Error al eliminar tarea:", error);
+            console.error("Error al añadir/actualizar tarea:", error);
         }
     };
-    
+     
     
 
+    // Delete a task
+    const deleteTask = async (taskId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/todos/${taskId}`, {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                    accept: "application/json",
+                },
+            });
+
+            if (response.ok) {
+                console.log("Task deleted successfully");
+                setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
+            } else {
+                console.error(`Error deleting task: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error("Error deleting task:", error);
+        }
+    };
+
     useEffect(() => {
-        fetchTasks();
+        createUser(); // Ensure the user exists before fetching tasks
     }, []);
 
     if (loading) {
-        return <div className="todo-container">Cargando...</div>;
+        return <div className="todo-container">Loading...</div>;
     }
 
     return (
         <div className="todo-container">
-            <h1 className="title">Lista de Tareas</h1>
+            <h1 className="title">Task List</h1>
             <div>
                 <input
                     className="todo-input"
                     type="text"
-                    placeholder="Añadir una tarea"
+                    placeholder="Add a task"
                     value={newTask}
                     onChange={(e) => setNewTask(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addTask()}
                 />
                 <ul className="todo-list">
-                    {Array.isArray(tasks) && tasks.length === 0 ? (
-                        <li className="no-tasks">No hay tareas, añadir tareas</li>
+                    {tasks.length === 0 ? (
+                        <li className="no-tasks">No tasks, add one!</li>
                     ) : (
-                        Array.isArray(tasks) &&
                         tasks.map((task) => (
                             <li key={task.id} className="todo-item">
                                 {task.label}
